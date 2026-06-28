@@ -662,31 +662,6 @@ body {
   border-color: var(--color-primary);
 }
 
-.support-group {
-  margin-top: 8px;
-}
-
-.support-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-  padding: 8px 14px;
-  border-radius: 8px;
-  background: rgba(99, 102, 241, 0.15);
-  border: 1px solid rgba(99, 102, 241, 0.35);
-  color: var(--text-main);
-  font-size: 12px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: var(--transition);
-}
-
-.support-link:hover {
-  background: rgba(99, 102, 241, 0.25);
-  border-color: var(--color-primary);
-}
-
 /* Custom Switch Toggle button */
 .switch {
   position: relative;
@@ -933,4 +908,21 @@ input:checked + .slider:before {
 .app-footer .status-msg {
   font-weight: 600;
   color: var(--text-dark);
+}
+
+.footer-version {
+  color: var(--text-dark);
+}
+
+.footer-support-link {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.footer-support-link:hover {
+  color: var(--color-primary);
+  text-decoration: underline;
 }
