@@ -25,6 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const inputSpeakSpeed = document.getElementById('inputSpeakSpeed');
   const inputCustomLimit = document.getElementById('inputCustomLimit');
   const shortcutHint = document.getElementById('shortcutHint');
+  const toggleLiveCounter = document.getElementById('toggleLiveCounter');
 
   let currentSettings = {};
   let lastAnalyzedText = '';
@@ -55,11 +56,12 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   function loadApp() {
-    chrome.storage.local.get(['wpmRead', 'wpmSpeak', 'customCharLimit'], (data) => {
+    chrome.storage.local.get(['wpmRead', 'wpmSpeak', 'customCharLimit', 'liveSelectionCounter'], (data) => {
       currentSettings = data;
       inputReadSpeed.value = data.wpmRead || 200;
       inputSpeakSpeed.value = data.wpmSpeak || 130;
       inputCustomLimit.value = data.customCharLimit || 500;
+      toggleLiveCounter.checked = data.liveSelectionCounter !== false;
       updateShortcutHint();
       queryPageSelection();
     });
@@ -279,6 +281,12 @@ document.addEventListener('DOMContentLoaded', () => {
       currentSettings.customCharLimit = limit;
       inputCustomLimit.value = limit;
       updateLimitsUI();
+    });
+  });
+
+  toggleLiveCounter.addEventListener('change', (e) => {
+    chrome.storage.local.set({ liveSelectionCounter: e.target.checked }, () => {
+      currentSettings.liveSelectionCounter = e.target.checked;
     });
   });
 

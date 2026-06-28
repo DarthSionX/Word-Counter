@@ -5,7 +5,8 @@ chrome.runtime.onInstalled.addListener(() => {
     const defaults = {
       wpmRead: 200,
       wpmSpeak: 130,
-      customCharLimit: 500
+      customCharLimit: 500,
+      liveSelectionCounter: true
     };
 
     const updates = {};

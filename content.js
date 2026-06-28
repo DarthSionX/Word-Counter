@@ -1,11 +1,55 @@
-// Content script — selection counting and on-page tooltip only
+// Content script — live selection panel and on-demand stats
+
+const PANEL_HOST_ID = 'word-counter-live-panel-root';
 
 let lastContextMenuCoords = null;
-let activeTooltipDismiss = null;
+let selectionDebounce = null;
+let panelHost = null;
+let panelShadow = null;
+let panelElement = null;
+let hidePanelTimer = null;
+
+let cachedSettings = {
+  wpmRead: 200,
+  wpmSpeak: 130,
+  liveSelectionCounter: true
+};
+
+function loadSettings() {
+  chrome.storage.local.get(['wpmRead', 'wpmSpeak', 'liveSelectionCounter'], (data) => {
+    cachedSettings = {
+      wpmRead: data.wpmRead || 200,
+      wpmSpeak: data.wpmSpeak || 130,
+      liveSelectionCounter: data.liveSelectionCounter !== false
+    };
+    if (!cachedSettings.liveSelectionCounter) {
+      hideLivePanel();
+    }
+  });
+}
+
+loadSettings();
+
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== 'local') return;
+
+  if (changes.wpmRead) cachedSettings.wpmRead = changes.wpmRead.newValue || 200;
+  if (changes.wpmSpeak) cachedSettings.wpmSpeak = changes.wpmSpeak.newValue || 130;
+  if (changes.liveSelectionCounter) {
+    cachedSettings.liveSelectionCounter = changes.liveSelectionCounter.newValue !== false;
+    if (!cachedSettings.liveSelectionCounter) hideLivePanel();
+    else handleSelectionChange();
+  }
+});
 
 document.addEventListener('contextmenu', (e) => {
   lastContextMenuCoords = { x: e.clientX, y: e.clientY };
 }, true);
+
+document.addEventListener('selectionchange', () => {
+  clearTimeout(selectionDebounce);
+  selectionDebounce = setTimeout(handleSelectionChange, 60);
+});
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === 'GET_SELECTION') {
@@ -15,10 +59,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   if (message.type === 'SHOW_SELECTION_TOOLTIP') {
     try {
-      showSelectionTooltip(message.stats, message.anchorCoords || null);
+      showLivePanel(message.stats, message.anchorCoords || null, { persist: true });
       sendResponse({ success: true });
     } catch (err) {
-      console.error('Error rendering selection tooltip:', err);
+      console.error('Error rendering selection panel:', err);
       sendResponse({ success: false });
     }
     return true;
@@ -36,131 +80,125 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         wpmRead: settings.wpmRead || 200,
         wpmSpeak: settings.wpmSpeak || 130
       });
-      showSelectionTooltip(stats, lastContextMenuCoords);
+      showLivePanel(stats, lastContextMenuCoords, { persist: true });
       sendResponse({ success: true });
     });
     return true;
   }
 });
 
-function dismissSelectionTooltip() {
-  if (activeTooltipDismiss) {
-    activeTooltipDismiss();
-    activeTooltipDismiss = null;
+function handleSelectionChange() {
+  if (!cachedSettings.liveSelectionCounter) {
+    hideLivePanel();
+    return;
   }
+
+  const text = window.getSelection().toString();
+  if (!text || !text.trim()) {
+    hideLivePanel();
+    return;
+  }
+
+  const stats = calculateTextStats(text, cachedSettings);
+  const rect = getSelectionRect();
+  if (!rect) {
+    hideLivePanel();
+    return;
+  }
+
+  showLivePanel(stats, rect, { persist: false });
 }
 
-function showSelectionTooltip(stats, anchorCoords = null) {
-  dismissSelectionTooltip();
+function getSelectionRect() {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0) return null;
 
-  const host = document.createElement('div');
-  host.id = 'word-counter-tooltip-root';
-  document.body.appendChild(host);
+  const range = selection.getRangeAt(0);
+  const rect = range.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return null;
 
-  const shadow = host.attachShadow({ mode: 'open' });
+  return {
+    left: rect.left,
+    top: rect.top,
+    width: rect.width,
+    height: rect.height,
+    centerX: rect.left + rect.width / 2,
+    centerY: rect.top
+  };
+}
 
-  let anchorX;
-  let anchorY;
-
-  if (anchorCoords) {
-    anchorX = anchorCoords.x;
-    anchorY = anchorCoords.y;
-  } else {
-    const selection = window.getSelection();
-    if (selection.rangeCount === 0) {
-      host.remove();
-      return;
-    }
-    const rect = selection.getRangeAt(0).getBoundingClientRect();
-    anchorX = rect.left + rect.width / 2;
-    anchorY = rect.top;
+function coordsToAnchor(coords) {
+  if (!coords) return getSelectionRect();
+  if (typeof coords.x === 'number') {
+    return { centerX: coords.x, centerY: coords.y, top: coords.y, left: coords.x, width: 0, height: 0 };
   }
+  return coords;
+}
 
-  const tooltip = document.createElement('div');
-  tooltip.className = 'selection-tooltip';
+function ensurePanel() {
+  if (panelHost && panelElement) return;
 
-  tooltip.innerHTML = `
-    <button class="tooltip-close" type="button" title="Close" aria-label="Close">&times;</button>
-    <div class="tooltip-row">
-      <span class="tooltip-val">${stats.wordCount.toLocaleString()}</span> <span class="tooltip-lbl">words</span>
-      <span class="tooltip-divider">|</span>
-      <span class="tooltip-val">${stats.charCount.toLocaleString()}</span> <span class="tooltip-lbl">chars</span>
-      <span class="tooltip-divider">|</span>
-      <span class="tooltip-val">${stats.charCountNoSpace.toLocaleString()}</span> <span class="tooltip-lbl">no space</span>
-      <span class="tooltip-divider">|</span>
-      <span class="tooltip-val">${stats.sentenceCount}</span> <span class="tooltip-lbl">sentences</span>
-      <span class="tooltip-divider">|</span>
-      <span class="tooltip-val">${stats.paragraphCount}</span> <span class="tooltip-lbl">paragraphs</span>
-      <span class="tooltip-divider">|</span>
-      <span class="tooltip-lbl">reading:</span> <span class="tooltip-val">${stats.readTime}</span>
-    </div>
-    <div class="tooltip-arrow"></div>
-  `;
+  panelHost = document.createElement('div');
+  panelHost.id = PANEL_HOST_ID;
+  document.body.appendChild(panelHost);
+
+  panelShadow = panelHost.attachShadow({ mode: 'open' });
 
   const style = document.createElement('style');
   style.textContent = `
-    .selection-tooltip {
+    .live-panel {
       position: fixed;
-      background: rgba(15, 23, 42, 0.95);
+      width: 228px;
+      background: rgba(15, 23, 42, 0.96);
       backdrop-filter: blur(8px);
       -webkit-backdrop-filter: blur(8px);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 8px;
-      padding: 8px 28px 8px 12px;
+      border-radius: 10px;
+      padding: 8px 10px 10px;
       color: #f8fafc;
-      font-family: 'Inter', -apple-system, sans-serif;
-      font-size: 11px;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.45);
       z-index: 2147483647;
-      pointer-events: auto;
+      pointer-events: none;
       opacity: 0;
-      transform: translate(-50%, 10px);
-      transition: opacity 0.2s ease, transform 0.2s ease;
+      transition: opacity 0.15s ease;
     }
-    .selection-tooltip.visible {
+    .live-panel.visible {
       opacity: 1;
-      transform: translate(-50%, 0);
     }
-    .tooltip-close {
-      position: absolute;
-      top: 4px;
-      right: 6px;
-      width: 18px;
-      height: 18px;
-      border: none;
-      border-radius: 4px;
-      background: transparent;
-      color: #94a3b8;
-      font-size: 16px;
-      line-height: 1;
-      cursor: pointer;
-      padding: 0;
+    .live-metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px 4px;
+    }
+    .live-metric {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
+      text-align: center;
+      min-width: 0;
     }
-    .tooltip-close:hover {
-      color: #f8fafc;
-      background: rgba(255, 255, 255, 0.08);
-    }
-    .tooltip-row {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      white-space: nowrap;
-    }
-    .tooltip-val {
+    .live-metric-value {
+      font-size: 11px;
       font-weight: 700;
       color: #6366f1;
+      line-height: 1.2;
     }
-    .tooltip-lbl {
+    .live-metric-value.time-read {
+      color: #a5b4fc;
+    }
+    .live-metric-value.time-speak {
+      color: #c084fc;
+    }
+    .live-metric-label {
+      font-size: 7px;
       color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+      margin-top: 2px;
+      line-height: 1.2;
     }
-    .tooltip-divider {
-      color: rgba(255, 255, 255, 0.15);
-      margin: 0 2px;
-    }
-    .tooltip-arrow {
+    .live-panel-arrow {
       position: absolute;
       bottom: -5px;
       left: 50%;
@@ -169,59 +207,121 @@ function showSelectionTooltip(stats, anchorCoords = null) {
       height: 0;
       border-left: 5px solid transparent;
       border-right: 5px solid transparent;
-      border-top: 5px solid rgba(15, 23, 42, 0.95);
+      border-top: 5px solid rgba(15, 23, 42, 0.96);
     }
   `;
 
-  shadow.appendChild(style);
-  shadow.appendChild(tooltip);
+  panelElement = document.createElement('div');
+  panelElement.className = 'live-panel';
+  panelElement.innerHTML = `
+    <div class="live-metrics-grid">
+      <div class="live-metric">
+        <span class="live-metric-value" data-stat="wordCount">0</span>
+        <span class="live-metric-label">Words</span>
+      </div>
+      <div class="live-metric">
+        <span class="live-metric-value" data-stat="charCountNoSpace">0</span>
+        <span class="live-metric-label">Chars</span>
+      </div>
+      <div class="live-metric">
+        <span class="live-metric-value" data-stat="sentenceCount">0</span>
+        <span class="live-metric-label">Sentences</span>
+      </div>
+      <div class="live-metric">
+        <span class="live-metric-value" data-stat="paragraphCount">0</span>
+        <span class="live-metric-label">Paragraphs</span>
+      </div>
+      <div class="live-metric">
+        <span class="live-metric-value time-read" data-stat="readTime">0s</span>
+        <span class="live-metric-label">Reading</span>
+      </div>
+      <div class="live-metric">
+        <span class="live-metric-value time-speak" data-stat="speakTime">0s</span>
+        <span class="live-metric-label">Speaking</span>
+      </div>
+    </div>
+    <div class="live-panel-arrow"></div>
+  `;
 
-  const margin = 8;
-  const offsetY = 42;
+  panelShadow.appendChild(style);
+  panelShadow.appendChild(panelElement);
+}
 
-  function clampPosition() {
-    const rect = tooltip.getBoundingClientRect();
-    let left = anchorX;
-    let top = anchorY - offsetY;
-
-    const halfWidth = rect.width / 2;
-    if (left - halfWidth < margin) left = halfWidth + margin;
-    if (left + halfWidth > window.innerWidth - margin) left = window.innerWidth - halfWidth - margin;
-    if (top < margin) top = anchorY + 16;
-
-    tooltip.style.left = `${left}px`;
-    tooltip.style.top = `${top}px`;
-  }
-
-  clampPosition();
-
-  requestAnimationFrame(() => {
-    tooltip.classList.add('visible');
-    clampPosition();
-  });
-
-  function hideTooltip() {
-    tooltip.classList.remove('visible');
-    setTimeout(() => host.remove(), 200);
-    document.removeEventListener('mousedown', clickHandler);
-    if (activeTooltipDismiss === hideTooltip) {
-      activeTooltipDismiss = null;
-    }
-  }
-
-  shadow.querySelector('.tooltip-close').addEventListener('click', (e) => {
-    e.stopPropagation();
-    hideTooltip();
-  });
-
-  const clickHandler = (e) => {
-    if (e.composedPath().includes(host)) return;
-    hideTooltip();
+function updatePanelValues(stats) {
+  const formatters = {
+    wordCount: (v) => v.toLocaleString(),
+    charCountNoSpace: (v) => v.toLocaleString(),
+    sentenceCount: (v) => v.toLocaleString(),
+    paragraphCount: (v) => v.toLocaleString(),
+    readTime: (v) => v,
+    speakTime: (v) => v
   };
 
-  setTimeout(() => {
-    document.addEventListener('mousedown', clickHandler);
-  }, 100);
+  panelShadow.querySelectorAll('[data-stat]').forEach((el) => {
+    const key = el.getAttribute('data-stat');
+    if (stats[key] !== undefined && formatters[key]) {
+      el.textContent = formatters[key](stats[key]);
+    }
+  });
+}
 
-  activeTooltipDismiss = hideTooltip;
+function positionLivePanel(anchor) {
+  if (!panelElement || !anchor) return;
+
+  const margin = 8;
+  const offsetY = 12;
+  let left = anchor.centerX;
+  let top = anchor.top - offsetY;
+
+  panelElement.style.left = `${left}px`;
+  panelElement.style.top = `${top}px`;
+  panelElement.style.transform = 'translate(-50%, -100%)';
+
+  const rect = panelElement.getBoundingClientRect();
+  const halfWidth = rect.width / 2;
+
+  if (left - halfWidth < margin) left = halfWidth + margin;
+  if (left + halfWidth > window.innerWidth - margin) left = window.innerWidth - halfWidth - margin;
+
+  if (top - rect.height < margin) {
+    top = anchor.top + (anchor.height || 16) + offsetY;
+    panelElement.style.transform = 'translate(-50%, 0)';
+  } else {
+    panelElement.style.transform = 'translate(-50%, -100%)';
+  }
+
+  panelElement.style.left = `${left}px`;
+  panelElement.style.top = `${top}px`;
+}
+
+function showLivePanel(stats, anchorCoords = null, { persist = false } = {}) {
+  clearTimeout(hidePanelTimer);
+
+  const anchor = coordsToAnchor(anchorCoords);
+  if (!anchor) return;
+
+  ensurePanel();
+  updatePanelValues(stats);
+  positionLivePanel(anchor);
+
+  requestAnimationFrame(() => {
+    panelElement.classList.add('visible');
+    positionLivePanel(anchor);
+  });
+}
+
+function hideLivePanel() {
+  if (!panelHost || !panelElement) return;
+
+  clearTimeout(hidePanelTimer);
+  panelElement.classList.remove('visible');
+
+  hidePanelTimer = setTimeout(() => {
+    if (panelHost) {
+      panelHost.remove();
+      panelHost = null;
+      panelShadow = null;
+      panelElement = null;
+    }
+  }, 150);
 }
