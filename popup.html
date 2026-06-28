@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Word Counter</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="logo-area">
+        <div class="logo-icon">W</div>
+        <div class="logo-text">
+          <h1>Word Counter</h1>
+          <span class="sub-text">Select, paste, or type</span>
+        </div>
+      </div>
+    </header>
+
+    <nav class="tabs-nav">
+      <button class="tab-link active" data-tab="workspace">Workspace</button>
+      <button class="tab-link" data-tab="limits">Limits</button>
+      <button class="tab-link" data-tab="settings">Settings</button>
+    </nav>
+
+    <main class="tabs-content">
+      <section class="tab-panel active" id="workspacePanel">
+        <div class="selection-card" id="selectionCard">
+          <div class="card-header">
+            <h3>Active Page Selection</h3>
+            <span class="live-dot" id="selectionDot"></span>
+          </div>
+          <div class="selection-text-container">
+            <p id="selectionPlaceholder">Highlight any text on the current page to analyze it here.</p>
+            <p id="selectionContent" class="hidden-text"></p>
+          </div>
+        </div>
+
+        <div class="input-card">
+          <textarea id="quickPasteArea" placeholder="Or paste/type your text here to count..."></textarea>
+          <div class="char-countdown" id="charCounter">0 characters</div>
+        </div>
+
+        <div class="metrics-grid">
+          <div class="metric-box">
+            <span class="metric-value" id="valWords">0</span>
+            <span class="metric-label">Words</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-value" id="valChars">0</span>
+            <span class="metric-label">Chars (no space)</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-value" id="valSentences">0</span>
+            <span class="metric-label">Sentences</span>
+          </div>
+          <div class="metric-box">
+            <span class="metric-value" id="valParagraphs">0</span>
+            <span class="metric-label">Paragraphs</span>
+          </div>
+          <div class="metric-box reading-time">
+            <span class="metric-value" id="valReadTime">0s</span>
+            <span class="metric-label">Reading Time</span>
+          </div>
+          <div class="metric-box speaking-time">
+            <span class="metric-value" id="valSpeakTime">0s</span>
+            <span class="metric-label">Speaking Time</span>
+          </div>
+        </div>
+
+        <button class="copy-stats-btn" id="copyStatsBtn" type="button" disabled>Copy Stats</button>
+
+        <div class="keywords-card" id="keywordsCard" style="display: none;">
+          <h3>Top Keywords</h3>
+          <div class="keywords-list" id="keywordsList"></div>
+        </div>
+      </section>
+
+      <section class="tab-panel" id="limitsPanel">
+        <p class="limits-hint">Character limits (with spaces), sorted tightest first. X / Twitter limit is for the free tier (280 chars).</p>
+        <div class="limits-empty" id="limitsEmpty">Select or paste text in Workspace first.</div>
+        <div class="limits-list" id="limitsList"></div>
+      </section>
+
+      <section class="tab-panel" id="settingsPanel">
+        <div class="settings-group">
+          <h3>Reading & Speaking Speed</h3>
+          <p class="setting-hint">Used to estimate reading and speaking time for counted text.</p>
+
+          <div class="settings-input-row">
+            <label for="inputReadSpeed">Reading Speed (Words/Min)</label>
+            <input type="number" id="inputReadSpeed" min="50" max="1000" step="10">
+          </div>
+
+          <div class="settings-input-row">
+            <label for="inputSpeakSpeed">Speaking Speed (Words/Min)</label>
+            <input type="number" id="inputSpeakSpeed" min="50" max="1000" step="10">
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Custom Limit</h3>
+          <p class="setting-hint">Shown on the Limits tab alongside platform presets.</p>
+
+          <div class="settings-input-row">
+            <label for="inputCustomLimit">Custom Character Limit</label>
+            <input type="number" id="inputCustomLimit" min="10" max="50000" step="10">
+          </div>
+        </div>
+
+        <div class="settings-group">
+          <h3>Keyboard Shortcut</h3>
+          <p class="shortcut-hint" id="shortcutHint">Count selection: Ctrl+Shift+W</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <span>Version 1.2.1</span>
+      <span class="status-msg">Never stores your text</span>
+    </footer>
+  </div>
+  <script src="text-stats.js"></script>
+  <script src="platform-limits.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Word Counter — Privacy Policy</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.6;
+      max-width: 720px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      color: #1e293b;
+    }
+    h1 { font-size: 1.75rem; margin-bottom: 0.25rem; }
+    h2 { font-size: 1.1rem; margin-top: 1.75rem; }
+    p, li { color: #334155; }
+    .updated { color: #64748b; font-size: 0.9rem; }
+    a { color: #4f46e5; }
+  </style>
+</head>
+<body>
+  <h1>Word Counter — Privacy Policy</h1>
+  <p class="updated">Last updated: June 28, 2026</p>
+
+  <p>Word Counter is a Chrome extension that counts words, characters, sentences, and paragraphs from text you select or paste. <strong>All text analysis happens locally in your browser.</strong> We do not collect, store, or transmit your text.</p>
+
+  <h2>Data We Collect</h2>
+  <p><strong>None.</strong> The extension does not collect personally identifiable information, usage analytics, or the content of pages you visit.</p>
+
+  <h2>Data Stored on Your Device</h2>
+  <p>The extension saves only your preferences using Chrome's local storage (<code>chrome.storage.local</code>):</p>
+  <ul>
+    <li>Reading speed (words per minute)</li>
+    <li>Speaking speed (words per minute)</li>
+    <li>Custom character limit</li>
+  </ul>
+  <p>Text you select, paste, or type is processed in memory and is <strong>never saved</strong> to disk or synced anywhere.</p>
+
+  <h2>Data Transmitted</h2>
+  <p><strong>None.</strong> The extension does not connect to external servers, APIs, or third-party analytics services.</p>
+
+  <h2>Website Access</h2>
+  <p>The extension injects a lightweight content script on web pages so it can read text you explicitly select — for example when you open the popup, use the keyboard shortcut (Ctrl+Shift+W / Cmd+Shift+W), or choose "Count Selected Words" from the right-click menu.</p>
+  <p>It does not read your full page content, browsing history, or keystrokes. Access occurs only when you initiate a count action.</p>
+
+  <h2>Permissions</h2>
+  <ul>
+    <li><strong>storage</strong> — Save your reading/speaking speed and custom limit settings.</li>
+    <li><strong>contextMenus</strong> — Add a "Count Selected Words" option to the right-click menu.</li>
+    <li><strong>activeTab</strong> — Read the currently selected text on the active tab when you request a count.</li>
+    <li><strong>notifications</strong> — Show count results as a system notification when an on-page tooltip cannot be displayed.</li>
+  </ul>
+
+  <h2>Children's Privacy</h2>
+  <p>This extension is not directed at children under 13 and does not knowingly collect any information from anyone.</p>
+
+  <h2>Changes to This Policy</h2>
+  <p>We may update this policy if the extension changes. The "Last updated" date at the top will reflect any revision. Continued use after changes constitutes acceptance of the updated policy.</p>
+
+  <h2>Contact</h2>
+  <p>Questions or concerns? Open an issue on <a href="https://github.com/DarthSionX/Word-Counter/issues">GitHub</a>.</p>
+</body>
+</html>
